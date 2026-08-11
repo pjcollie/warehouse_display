@@ -22,72 +22,50 @@ class WarehouseDisplay(tk.Tk):
         self.bind("<Escape>", lambda e: self.destroy())
 
         # Top bar
-        self.top_frame = tk.Frame(self, bg="#111111", height=90)
-        self.top_frame.pack(fill="x")
-        self.top_frame.pack_propagate(False)
+        top = tk.Frame(self, bg="#111111", height=90)
+        top.pack(fill="x")
+        top.pack_propagate(False)
 
-        self.date_label = tk.Label(
-            self.top_frame, text="", font=("DejaVu Sans", 26, "bold"),
-            fg="#ecf0f1", bg="#111111"
-        )
-        self.date_label.pack(side="left", padx=40, pady=20)
+        self.date_label = tk.Label(top, text="", font=("FreeSans", 24, "bold"),
+                                   fg="#ecf0f1", bg="#111111")
+        self.date_label.pack(side="left", padx=30, pady=20)
 
-        self.time_label = tk.Label(
-            self.top_frame, text="", font=("DejaVu Sans", 34, "bold"),
-            fg="#ffffff", bg="#111111"
-        )
-        self.time_label.pack(side="right", padx=40, pady=15)
+        self.time_label = tk.Label(top, text="", font=("FreeSans", 32, "bold"),
+                                   fg="white", bg="#111111")
+        self.time_label.pack(side="right", padx=30, pady=15)
 
-        # Days without mistake
-        self.days_frame = tk.Frame(self, bg="#1a1a1a")
-        self.days_frame.pack(fill="x", pady=(25, 5))
+        # Days
+        days_frame = tk.Frame(self, bg="#1a1a1a")
+        days_frame.pack(fill="x", pady=20)
 
-        self.days_label = tk.Label(
-            self.days_frame, text="0", font=("DejaVu Sans", 72, "bold"),
-            fg="#2ecc71", bg="#1a1a1a"
-        )
+        self.days_label = tk.Label(days_frame, text="0", font=("FreeSans", 70, "bold"),
+                                   fg="#2ecc71", bg="#1a1a1a")
         self.days_label.pack()
 
-        self.days_text = tk.Label(
-            self.days_frame, text="DAYS WITHOUT A MISTAKE",
-            font=("DejaVu Sans", 18), fg="#bdc3c7", bg="#1a1a1a"
-        )
-        self.days_text.pack()
+        tk.Label(days_frame, text="DAYS WITHOUT A MISTAKE",
+                 font=("FreeSans", 18), fg="#bdc3c7", bg="#1a1a1a").pack()
 
         # Hot List header
-        self.list_header = tk.Label(
-            self, text="HOT LIST", font=("DejaVu Sans", 18, "bold"),
-            fg="#ecf0f1", bg="#1a1a1a", anchor="w"
-        )
-        self.list_header.pack(fill="x", padx=40, pady=(20, 5))
+        tk.Label(self, text="HOT LIST", font=("FreeSans", 18, "bold"),
+                 fg="white", bg="#1a1a1a", anchor="w").pack(fill="x", padx=30, pady=(10, 5))
 
-        # Scrollable area
-        container = tk.Frame(self, bg="#1a1a1a")
-        container.pack(fill="both", expand=True, padx=40, pady=10)
+        # Simple scrollable list (no complicated canvas tricks)
+        list_container = tk.Frame(self, bg="#1a1a1a")
+        list_container.pack(fill="both", expand=True, padx=30, pady=5)
 
-        self.canvas = tk.Canvas(container, bg="#1a1a1a", highlightthickness=0)
-        self.scrollbar = ttk.Scrollbar(container, orient="vertical", command=self.canvas.yview)
+        self.canvas = tk.Canvas(list_container, bg="#1a1a1a", highlightthickness=0)
+        scrollbar = ttk.Scrollbar(list_container, orient="vertical", command=self.canvas.yview)
         self.list_frame = tk.Frame(self.canvas, bg="#1a1a1a")
 
-        self.list_frame.bind("<Configure>", self._on_frame_configure)
-        self.canvas.bind("<Configure>", self._on_canvas_configure)
+        self.list_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
+        self.canvas.create_window((0, 0), window=self.list_frame, anchor="nw", width=self.winfo_screenwidth()-100)
 
-        self.canvas_window = self.canvas.create_window((0, 0), window=self.list_frame, anchor="nw")
-
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
-
+        self.canvas.configure(yscrollcommand=scrollbar.set)
         self.canvas.pack(side="left", fill="both", expand=True)
-        self.scrollbar.pack(side="right", fill="y")
+        scrollbar.pack(side="right", fill="y")
 
         self.update_clock()
         self.refresh_data()
-
-    def _on_frame_configure(self, event):
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-
-    def _on_canvas_configure(self, event):
-        # Force the inner frame to match the canvas width
-        self.canvas.itemconfig(self.canvas_window, width=event.width)
 
     def update_clock(self):
         now = datetime.now()
@@ -96,54 +74,47 @@ class WarehouseDisplay(tk.Tk):
         self.after(1000, self.update_clock)
 
     def clear_list(self):
-        for widget in self.list_frame.winfo_children():
-            widget.destroy()
+        for w in self.list_frame.winfo_children():
+            w.destroy()
 
     def add_item_row(self, item):
         priority = item.get("priority", "Normal")
         color = PRIORITY_COLORS.get(priority, "#2ecc71")
 
-        row = tk.Frame(self.list_frame, bg="#2c2c2c", height=75)
-        row.pack(fill="x", pady=5)
+        row = tk.Frame(self.list_frame, bg="#2c2c2c", height=80)
+        row.pack(fill="x", pady=6)
         row.pack_propagate(False)
 
-        # Priority color bar
-        bar = tk.Frame(row, bg=color, width=10)
-        bar.pack(side="left", fill="y")
+        # Color bar
+        tk.Frame(row, bg=color, width=12).pack(side="left", fill="y")
 
-        content = tk.Frame(row, bg="#2c2c2c")
-        content.pack(side="left", fill="both", expand=True, padx=15)
+        # Text content - using a single multi-line label for maximum reliability
+        text = f"#{item.get('order_number', '')}   |   {item.get('location', '')}\n{item.get('description', '')}"
 
-        # Order number + location
-        top = tk.Frame(content, bg="#2c2c2c")
-        top.pack(fill="x", pady=(10, 0))
-
-        tk.Label(
-            top, text=f"#{item.get('order_number', '')}",
-            font=("DejaVu Sans", 16, "bold"), fg="white", bg="#2c2c2c"
-        ).pack(side="left")
-
-        tk.Label(
-            top, text=item.get("location", ""),
-            font=("DejaVu Sans", 14), fg="#bdc3c7", bg="#2c2c2c"
-        ).pack(side="right")
-
-        # Description
-        tk.Label(
-            content, text=item.get("description", ""),
-            font=("DejaVu Sans", 15), fg="#ecf0f1", bg="#2c2c2c",
-            anchor="w"
-        ).pack(fill="x", pady=(4, 10))
+        lbl = tk.Label(
+            row,
+            text=text,
+            font=("FreeSans", 16),
+            fg="white",
+            bg="#2c2c2c",
+            justify="left",
+            anchor="w",
+            padx=15,
+            pady=10
+        )
+        lbl.pack(side="left", fill="both", expand=True)
 
     def refresh_data(self):
         try:
             r = requests.get(API_URL, timeout=2)
             data = r.json()
-
             self.days_label.config(text=str(data.get("days_without_mistake", 0)))
 
             self.clear_list()
-            for item in data.get("hot_list", []):
+            items = data.get("hot_list", [])
+            print(f"Loading {len(items)} items...")  # debug to terminal
+
+            for item in items:
                 self.add_item_row(item)
 
         except Exception as e:
