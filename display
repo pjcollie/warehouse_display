@@ -27,13 +27,13 @@ class WarehouseDisplay(tk.Tk):
         self.top_frame.pack_propagate(False)
 
         self.date_label = tk.Label(
-            self.top_frame, text="", font=("Segoe UI", 28, "bold"),
+            self.top_frame, text="", font=("DejaVu Sans", 26, "bold"),
             fg="#ecf0f1", bg="#111111"
         )
         self.date_label.pack(side="left", padx=40, pady=20)
 
         self.time_label = tk.Label(
-            self.top_frame, text="", font=("Segoe UI", 36, "bold"),
+            self.top_frame, text="", font=("DejaVu Sans", 34, "bold"),
             fg="#ffffff", bg="#111111"
         )
         self.time_label.pack(side="right", padx=40, pady=15)
@@ -43,20 +43,20 @@ class WarehouseDisplay(tk.Tk):
         self.days_frame.pack(fill="x", pady=(30, 10))
 
         self.days_label = tk.Label(
-            self.days_frame, text="0", font=("Segoe UI", 72, "bold"),
+            self.days_frame, text="0", font=("DejaVu Sans", 72, "bold"),
             fg="#2ecc71", bg="#1a1a1a"
         )
         self.days_label.pack()
 
         self.days_text = tk.Label(
             self.days_frame, text="DAYS WITHOUT A MISTAKE",
-            font=("Segoe UI", 22), fg="#bdc3c7", bg="#1a1a1a"
+            font=("DejaVu Sans", 20), fg="#bdc3c7", bg="#1a1a1a"
         )
         self.days_text.pack()
 
         # Hot List header
         self.list_header = tk.Label(
-            self, text="HOT LIST", font=("Segoe UI", 20, "bold"),
+            self, text="HOT LIST", font=("DejaVu Sans", 18, "bold"),
             fg="#ecf0f1", bg="#1a1a1a", anchor="w"
         )
         self.list_header.pack(fill="x", padx=40, pady=(25, 5))
@@ -109,17 +109,17 @@ class WarehouseDisplay(tk.Tk):
 
         tk.Label(
             top_line, text=f"#{item.get('order_number', '')}",
-            font=("Segoe UI", 16, "bold"), fg="#ffffff", bg="#2c2c2c"
+            font=("DejaVu Sans", 15, "bold"), fg="#ffffff", bg="#2c2c2c"
         ).pack(side="left")
 
         tk.Label(
             top_line, text=item.get("location", ""),
-            font=("Segoe UI", 14), fg="#bdc3c7", bg="#2c2c2c"
+            font=("DejaVu Sans", 13), fg="#bdc3c7", bg="#2c2c2c"
         ).pack(side="right")
 
         tk.Label(
             content, text=item.get("description", ""),
-            font=("Segoe UI", 15), fg="#ecf0f1", bg="#2c2c2c", anchor="w"
+            font=("DejaVu Sans", 14), fg="#ecf0f1", bg="#2c2c2c", anchor="w"
         ).pack(fill="x", pady=(2, 0))
 
     def refresh_data(self):
