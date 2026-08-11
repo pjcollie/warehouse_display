@@ -4,7 +4,7 @@ import requests
 from datetime import datetime
 
 API_URL = "http://127.0.0.1:5000/data"
-REFRESH_MS = 5000
+REFRESH_MS = 4000
 
 PRIORITY_COLORS = {
     "Critical": "#e74c3c",
@@ -21,7 +21,7 @@ class WarehouseDisplay(tk.Tk):
         self.attributes("-fullscreen", True)
         self.bind("<Escape>", lambda e: self.destroy())
 
-        # Top bar - Time & Date
+        # Top bar
         self.top_frame = tk.Frame(self, bg="#111111", height=90)
         self.top_frame.pack(fill="x")
         self.top_frame.pack_propagate(False)
@@ -40,7 +40,7 @@ class WarehouseDisplay(tk.Tk):
 
         # Days without mistake
         self.days_frame = tk.Frame(self, bg="#1a1a1a")
-        self.days_frame.pack(fill="x", pady=(30, 10))
+        self.days_frame.pack(fill="x", pady=(25, 5))
 
         self.days_label = tk.Label(
             self.days_frame, text="0", font=("DejaVu Sans", 72, "bold"),
@@ -50,7 +50,7 @@ class WarehouseDisplay(tk.Tk):
 
         self.days_text = tk.Label(
             self.days_frame, text="DAYS WITHOUT A MISTAKE",
-            font=("DejaVu Sans", 20), fg="#bdc3c7", bg="#1a1a1a"
+            font=("DejaVu Sans", 18), fg="#bdc3c7", bg="#1a1a1a"
         )
         self.days_text.pack()
 
@@ -59,26 +59,35 @@ class WarehouseDisplay(tk.Tk):
             self, text="HOT LIST", font=("DejaVu Sans", 18, "bold"),
             fg="#ecf0f1", bg="#1a1a1a", anchor="w"
         )
-        self.list_header.pack(fill="x", padx=40, pady=(25, 5))
+        self.list_header.pack(fill="x", padx=40, pady=(20, 5))
 
-        # Scrollable hot list
-        self.canvas = tk.Canvas(self, bg="#1a1a1a", highlightthickness=0)
-        self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        # Scrollable area
+        container = tk.Frame(self, bg="#1a1a1a")
+        container.pack(fill="both", expand=True, padx=40, pady=10)
+
+        self.canvas = tk.Canvas(container, bg="#1a1a1a", highlightthickness=0)
+        self.scrollbar = ttk.Scrollbar(container, orient="vertical", command=self.canvas.yview)
         self.list_frame = tk.Frame(self.canvas, bg="#1a1a1a")
 
-        self.list_frame.bind(
-            "<Configure>",
-            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-        )
+        self.list_frame.bind("<Configure>", self._on_frame_configure)
+        self.canvas.bind("<Configure>", self._on_canvas_configure)
 
-        self.canvas.create_window((0, 0), window=self.list_frame, anchor="nw")
+        self.canvas_window = self.canvas.create_window((0, 0), window=self.list_frame, anchor="nw")
+
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
 
-        self.canvas.pack(side="left", fill="both", expand=True, padx=(40, 0), pady=10)
-        self.scrollbar.pack(side="right", fill="y", padx=(0, 20), pady=10)
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
 
         self.update_clock()
         self.refresh_data()
+
+    def _on_frame_configure(self, event):
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _on_canvas_configure(self, event):
+        # Force the inner frame to match the canvas width
+        self.canvas.itemconfig(self.canvas_window, width=event.width)
 
     def update_clock(self):
         now = datetime.now()
@@ -94,33 +103,37 @@ class WarehouseDisplay(tk.Tk):
         priority = item.get("priority", "Normal")
         color = PRIORITY_COLORS.get(priority, "#2ecc71")
 
-        row = tk.Frame(self.list_frame, bg="#2c2c2c", height=70)
-        row.pack(fill="x", pady=6, padx=5)
+        row = tk.Frame(self.list_frame, bg="#2c2c2c", height=75)
+        row.pack(fill="x", pady=5)
         row.pack_propagate(False)
 
-        bar = tk.Frame(row, bg=color, width=8)
+        # Priority color bar
+        bar = tk.Frame(row, bg=color, width=10)
         bar.pack(side="left", fill="y")
 
         content = tk.Frame(row, bg="#2c2c2c")
-        content.pack(side="left", fill="both", expand=True, padx=15, pady=8)
+        content.pack(side="left", fill="both", expand=True, padx=15)
 
-        top_line = tk.Frame(content, bg="#2c2c2c")
-        top_line.pack(fill="x")
+        # Order number + location
+        top = tk.Frame(content, bg="#2c2c2c")
+        top.pack(fill="x", pady=(10, 0))
 
         tk.Label(
-            top_line, text=f"#{item.get('order_number', '')}",
-            font=("DejaVu Sans", 15, "bold"), fg="#ffffff", bg="#2c2c2c"
+            top, text=f"#{item.get('order_number', '')}",
+            font=("DejaVu Sans", 16, "bold"), fg="white", bg="#2c2c2c"
         ).pack(side="left")
 
         tk.Label(
-            top_line, text=item.get("location", ""),
-            font=("DejaVu Sans", 13), fg="#bdc3c7", bg="#2c2c2c"
+            top, text=item.get("location", ""),
+            font=("DejaVu Sans", 14), fg="#bdc3c7", bg="#2c2c2c"
         ).pack(side="right")
 
+        # Description
         tk.Label(
             content, text=item.get("description", ""),
-            font=("DejaVu Sans", 14), fg="#ecf0f1", bg="#2c2c2c", anchor="w"
-        ).pack(fill="x", pady=(2, 0))
+            font=("DejaVu Sans", 15), fg="#ecf0f1", bg="#2c2c2c",
+            anchor="w"
+        ).pack(fill="x", pady=(4, 10))
 
     def refresh_data(self):
         try:
