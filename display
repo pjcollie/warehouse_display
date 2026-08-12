@@ -49,7 +49,7 @@ class WarehouseDisplay(tk.Tk):
         tk.Label(self, text="HOT LIST", font=("FreeSans", 18, "bold"),
                  fg="white", bg="#1a1a1a", anchor="w").pack(fill="x", padx=30, pady=(10, 5))
 
-        # Simple scrollable list (no complicated canvas tricks)
+        # Simple scrollable list
         list_container = tk.Frame(self, bg="#1a1a1a")
         list_container.pack(fill="both", expand=True, padx=30, pady=5)
 
@@ -59,8 +59,8 @@ class WarehouseDisplay(tk.Tk):
 
         self.list_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
         self.canvas.create_window((0, 0), window=self.list_frame, anchor="nw", width=self.winfo_screenwidth()-100)
-
         self.canvas.configure(yscrollcommand=scrollbar.set)
+
         self.canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
@@ -81,26 +81,25 @@ class WarehouseDisplay(tk.Tk):
         priority = item.get("priority", "Normal")
         color = PRIORITY_COLORS.get(priority, "#2ecc71")
 
-        row = tk.Frame(self.list_frame, bg="#2c2c2c", height=80)
+        row = tk.Frame(self.list_frame, bg="#2c2c2c", height=100)
         row.pack(fill="x", pady=6)
         row.pack_propagate(False)
 
         # Color bar
         tk.Frame(row, bg=color, width=12).pack(side="left", fill="y")
 
-        # Text content - using a single multi-line label for maximum reliability
-        text = f"#{item.get('order_number', '')}   |   {item.get('location', '')}\n{item.get('description', '')}"
-
+        # Text content
+        text = f"#{item.get('order_number', '')} | {item.get('location', '')}\n{item.get('description', '')}"
         lbl = tk.Label(
             row,
             text=text,
-            font=("FreeSans", 16),
+            font=("FreeSans", 22),
             fg="white",
             bg="#2c2c2c",
             justify="left",
             anchor="w",
             padx=15,
-            pady=10
+            pady=12
         )
         lbl.pack(side="left", fill="both", expand=True)
 
@@ -109,17 +108,13 @@ class WarehouseDisplay(tk.Tk):
             r = requests.get(API_URL, timeout=2)
             data = r.json()
             self.days_label.config(text=str(data.get("days_without_mistake", 0)))
-
             self.clear_list()
             items = data.get("hot_list", [])
             print(f"Loading {len(items)} items...")  # debug to terminal
-
             for item in items:
                 self.add_item_row(item)
-
         except Exception as e:
             print("Refresh error:", e)
-
         self.after(REFRESH_MS, self.refresh_data)
 
 if __name__ == "__main__":
