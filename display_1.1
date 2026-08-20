@@ -1,0 +1,128 @@
+import tkinter as tk
+from tkinter import ttk
+import requests
+from datetime import datetime
+
+API_URL = "http://127.0.0.1:5000/data"
+REFRESH_MS = 4000
+
+PRIORITY_COLORS = {
+    "Critical": "#e74c3c",
+    "High": "#e67e22",
+    "Medium": "#f1c40f",
+    "Normal": "#2ecc71"
+}
+
+class WarehouseDisplay(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Warehouse Display")
+        self.configure(bg="#1a1a1a")
+        self.attributes("-fullscreen", True)
+        self.bind("<Escape>", lambda e: self.destroy())
+
+        # Top bar
+        top = tk.Frame(self, bg="#111111", height=90)
+        top.pack(fill="x")
+        top.pack_propagate(False)
+
+        self.date_label = tk.Label(top, text="", font=("FreeSans", 24, "bold"),
+                                   fg="#ecf0f1", bg="#111111")
+        self.date_label.pack(side="left", padx=30, pady=20)
+
+        self.time_label = tk.Label(top, text="", font=("FreeSans", 32, "bold"),
+                                   fg="white", bg="#111111")
+        self.time_label.pack(side="right", padx=30, pady=15)
+
+        # Days
+        days_frame = tk.Frame(self, bg="#1a1a1a")
+        days_frame.pack(fill="x", pady=20)
+
+        self.days_label = tk.Label(days_frame, text="0", font=("FreeSans", 70, "bold"),
+                                   fg="#2ecc71", bg="#1a1a1a")
+        self.days_label.pack()
+
+        tk.Label(days_frame, text="DAYS WITHOUT A MISTAKE",
+                 font=("FreeSans", 18), fg="#bdc3c7", bg="#1a1a1a").pack()
+
+        # Hot List header
+        tk.Label(self, text="HOT LIST", font=("FreeSans", 18, "bold"),
+                 fg="white", bg="#1a1a1a", anchor="w").pack(fill="x", padx=30, pady=(10, 5))
+
+        # Simple scrollable list
+        list_container = tk.Frame(self, bg="#1a1a1a")
+        list_container.pack(fill="both", expand=True, padx=30, pady=5)
+
+        self.canvas = tk.Canvas(list_container, bg="#1a1a1a", highlightthickness=0)
+        scrollbar = ttk.Scrollbar(list_container, orient="vertical", command=self.canvas.yview)
+        self.list_frame = tk.Frame(self.canvas, bg="#1a1a1a")
+
+        self.list_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
+        self.canvas.create_window((0, 0), window=self.list_frame, anchor="nw", width=self.winfo_screenwidth()-100)
+
+        self.canvas.configure(yscrollcommand=scrollbar.set)
+        self.canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        self.update_clock()
+        self.refresh_data()
+
+    def update_clock(self):
+        now = datetime.now()
+        self.date_label.config(text=now.strftime("%A, %B %d, %Y").upper())
+        self.time_label.config(text=now.strftime("%I:%M %p"))
+        self.after(1000, self.update_clock)
+
+    def clear_list(self):
+        for w in self.list_frame.winfo_children():
+            w.destroy()
+
+    def add_item_row(self, item):
+        priority = item.get("priority", "Normal")
+        color = PRIORITY_COLORS.get(priority, "#2ecc71")
+
+        row = tk.Frame(self.list_frame, bg="#2c2c2c", height=130)
+        row.pack(fill="x", pady=8)
+        row.pack_propagate(False)
+
+        # Color bar
+        tk.Frame(row, bg=color, width=14).pack(side="left", fill="y")
+
+        # Text content - larger fonts for TV viewing
+        text = f"#{item.get('order_number', '')}   |   {item.get('location', '')}\n{item.get('description', '')}"
+
+        lbl = tk.Label(
+            row,
+            text=text,
+            font=("FreeSans", 32, "bold"),
+            fg="white",
+            bg="#2c2c2c",
+            justify="left",
+            anchor="w",
+            padx=20,
+            pady=15
+        )
+        lbl.pack(side="left", fill="both", expand=True)
+
+    def refresh_data(self):
+        try:
+            r = requests.get(API_URL, timeout=2)
+            data = r.json()
+
+            self.days_label.config(text=str(data.get("days_without_mistake", 0)))
+
+            self.clear_list()
+            items = data.get("hot_list", [])
+            print(f"Loading {len(items)} items...")
+
+            for item in items:
+                self.add_item_row(item)
+
+        except Exception as e:
+            print("Refresh error:", e)
+
+        self.after(REFRESH_MS, self.refresh_data)
+
+if __name__ == "__main__":
+    app = WarehouseDisplay()
+    app.mainloop()
