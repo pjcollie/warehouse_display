@@ -81,26 +81,26 @@ class WarehouseDisplay(tk.Tk):
         priority = item.get("priority", "Normal")
         color = PRIORITY_COLORS.get(priority, "#2ecc71")
 
-        row = tk.Frame(self.list_frame, bg="#2c2c2c", height=130)
-        row.pack(fill="x", pady=8)
+        row = tk.Frame(self.list_frame, bg="#2c2c2c", height=160)
+        row.pack(fill="x", pady=10)
         row.pack_propagate(False)
 
         # Color bar
-        tk.Frame(row, bg=color, width=14).pack(side="left", fill="y")
+        tk.Frame(row, bg=color, width=16).pack(side="left", fill="y")
 
-        # Text content - larger fonts for TV viewing
+        # Larger text for TV
         text = f"#{item.get('order_number', '')}   |   {item.get('location', '')}\n{item.get('description', '')}"
 
         lbl = tk.Label(
             row,
             text=text,
-            font=("FreeSans", 32, "bold"),
+            font=("FreeSans", 42, "bold"),      # ← Even larger
             fg="white",
             bg="#2c2c2c",
             justify="left",
             anchor="w",
-            padx=20,
-            pady=15
+            padx=25,
+            pady=18
         )
         lbl.pack(side="left", fill="both", expand=True)
 
