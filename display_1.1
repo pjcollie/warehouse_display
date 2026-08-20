@@ -21,7 +21,7 @@ class WarehouseDisplay(tk.Tk):
         self.attributes("-fullscreen", True)
         self.bind("<Escape>", lambda e: self.destroy())
 
-        # Top bar
+        # ---------- Top bar ----------
         top = tk.Frame(self, bg="#111111", height=90)
         top.pack(fill="x")
         top.pack_propagate(False)
@@ -34,7 +34,7 @@ class WarehouseDisplay(tk.Tk):
                                    fg="white", bg="#111111")
         self.time_label.pack(side="right", padx=30, pady=15)
 
-        # Days
+        # ---------- Days Without a Mistake ----------
         days_frame = tk.Frame(self, bg="#1a1a1a")
         days_frame.pack(fill="x", pady=20)
 
@@ -45,24 +45,22 @@ class WarehouseDisplay(tk.Tk):
         tk.Label(days_frame, text="DAYS WITHOUT A MISTAKE",
                  font=("FreeSans", 18), fg="#bdc3c7", bg="#1a1a1a").pack()
 
-        # Hot List header
-        tk.Label(self, text="HOT LIST", font=("FreeSans", 18, "bold"),
-                 fg="white", bg="#1a1a1a", anchor="w").pack(fill="x", padx=30, pady=(10, 5))
+        # ---------- Hot List header with STATUS column ----------
+        header = tk.Frame(self, bg="#1a1a1a")
+        header.pack(fill="x", padx=30, pady=(15, 5))
 
-        # Simple scrollable list
-        list_container = tk.Frame(self, bg="#1a1a1a")
-        list_container.pack(fill="both", expand=True, padx=30, pady=5)
+        tk.Label(header, text="HOT LIST", font=("FreeSans", 18, "bold"),
+                 fg="white", bg="#1a1a1a", anchor="w").pack(side="left")
 
-        self.canvas = tk.Canvas(list_container, bg="#1a1a1a", highlightthickness=0)
-        scrollbar = ttk.Scrollbar(list_container, orient="vertical", command=self.canvas.yview)
-        self.list_frame = tk.Frame(self.canvas, bg="#1a1a1a")
+        tk.Label(header, text="STATUS", font=("FreeSans", 18, "bold"),
+                 fg="#bdc3c7", bg="#1a1a1a", anchor="e").pack(side="right", padx=20)
 
-        self.list_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
-        self.canvas.create_window((0, 0), window=self.list_frame, anchor="nw", width=self.winfo_screenwidth()-100)
+        # ---------- List container ----------
+        self.list_container = tk.Frame(self, bg="#1a1a1a")
+        self.list_container.pack(fill="both", expand=True, padx=30, pady=5)
 
-        self.canvas.configure(yscrollcommand=scrollbar.set)
-        self.canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        self.list_frame = tk.Frame(self.list_container, bg="#1a1a1a")
+        self.list_frame.pack(fill="both", expand=True)
 
         self.update_clock()
         self.refresh_data()
@@ -77,32 +75,58 @@ class WarehouseDisplay(tk.Tk):
         for w in self.list_frame.winfo_children():
             w.destroy()
 
-    def add_item_row(self, item):
+    def add_item_row(self, item, row_height, font_size):
         priority = item.get("priority", "Normal")
+        status = item.get("status", "Open")
         color = PRIORITY_COLORS.get(priority, "#2ecc71")
 
-        row = tk.Frame(self.list_frame, bg="#2c2c2c", height=160)
-        row.pack(fill="x", pady=10)
+        # Dim completed items
+        if status == "Complete":
+            row_bg = "#222222"
+            text_fg = "#7f8c8d"
+            status_fg = "#95a5a6"
+        else:
+            row_bg = "#2c2c2c"
+            text_fg = "white"
+            status_fg = "#2ecc71"   # bright green for Open
+
+        row = tk.Frame(self.list_frame, bg=row_bg, height=row_height)
+        row.pack(fill="x", pady=max(4, int(row_height * 0.06)))
         row.pack_propagate(False)
 
-        # Color bar
-        tk.Frame(row, bg=color, width=16).pack(side="left", fill="y")
+        # Left color bar (priority)
+        bar_width = max(10, int(row_height * 0.1))
+        tk.Frame(row, bg=color, width=bar_width).pack(side="left", fill="y")
 
-        # Larger text for TV
-        text = f"#{item.get('order_number', '')}   |   {item.get('location', '')}\n{item.get('description', '')}"
+        # Main text
+        text = f"#{item.get('order_number', '')}  |  {item.get('location', '')}\n{item.get('description', '')}"
 
         lbl = tk.Label(
             row,
             text=text,
-            font=("FreeSans", 42, "bold"),      # ← Even larger
-            fg="white",
-            bg="#2c2c2c",
+            font=("FreeSans", font_size, "bold"),
+            fg=text_fg,
+            bg=row_bg,
             justify="left",
             anchor="w",
-            padx=25,
-            pady=18
+            padx=20,
+            pady=8
         )
         lbl.pack(side="left", fill="both", expand=True)
+
+        # Status on the far right
+        status_font = max(16, int(font_size * 0.6))
+        status_label = tk.Label(
+            row,
+            text=status.upper(),
+            font=("FreeSans", status_font, "bold"),
+            fg=status_fg,
+            bg=row_bg,
+            width=12,          # keeps the column aligned
+            anchor="e",
+            padx=15
+        )
+        status_label.pack(side="right")
 
     def refresh_data(self):
         try:
@@ -112,16 +136,34 @@ class WarehouseDisplay(tk.Tk):
             self.days_label.config(text=str(data.get("days_without_mistake", 0)))
 
             self.clear_list()
+
             items = data.get("hot_list", [])
-            print(f"Loading {len(items)} items...")
+            # Open items first
+            items.sort(key=lambda x: 0 if x.get("status", "Open") == "Open" else 1)
+
+            count = len(items)
+            print(f"Loading {count} items...")
+
+            if count == 0:
+                return
+
+            # Dynamic sizing
+            self.update_idletasks()
+            available_height = self.list_container.winfo_height()
+            usable = max(200, available_height - 20)
+
+            ideal_row = usable / count
+            row_height = max(70, min(160, int(ideal_row)))
+            font_size = max(18, min(42, int(row_height * 0.28)))
 
             for item in items:
-                self.add_item_row(item)
+                self.add_item_row(item, row_height, font_size)
 
         except Exception as e:
             print("Refresh error:", e)
 
         self.after(REFRESH_MS, self.refresh_data)
+
 
 if __name__ == "__main__":
     app = WarehouseDisplay()
