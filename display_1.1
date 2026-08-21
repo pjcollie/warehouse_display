@@ -1,9 +1,10 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 import requests
 from datetime import datetime
 
 API_URL = "http://127.0.0.1:5000/data"
+BASE_URL = "http://127.0.0.1:5000"
 REFRESH_MS = 4000
 
 PRIORITY_COLORS = {
@@ -36,34 +37,34 @@ class WarehouseDisplay(tk.Tk):
 
         # ---------- Days Without a Mistake ----------
         days_frame = tk.Frame(self, bg="#1a1a1a")
-        days_frame.pack(fill="x", pady=15)
+        days_frame.pack(fill="x", pady=20)
 
-        self.days_label = tk.Label(days_frame, text="0", font=("FreeSans", 64, "bold"),
+        self.days_label = tk.Label(days_frame, text="0", font=("FreeSans", 70, "bold"),
                                    fg="#2ecc71", bg="#1a1a1a")
         self.days_label.pack()
 
         tk.Label(days_frame, text="DAYS WITHOUT A MISTAKE",
-                 font=("FreeSans", 16), fg="#bdc3c7", bg="#1a1a1a").pack()
+                 font=("FreeSans", 18), fg="#bdc3c7", bg="#1a1a1a").pack()
 
-        # ---------- Hot List header with STATUS ----------
+        # ---------- Hot List header with STATUS column ----------
         header = tk.Frame(self, bg="#1a1a1a")
-        header.pack(fill="x", padx=30, pady=(10, 4))
+        header.pack(fill="x", padx=30, pady=(15, 5))
 
-        tk.Label(header, text="HOT LIST", font=("FreeSans", 17, "bold"),
+        tk.Label(header, text="HOT LIST", font=("FreeSans", 18, "bold"),
                  fg="white", bg="#1a1a1a", anchor="w").pack(side="left")
 
-        tk.Label(header, text="STATUS", font=("FreeSans", 17, "bold"),
-                 fg="#bdc3c7", bg="#1a1a1a", anchor="e").pack(side="right", padx=15)
+        tk.Label(header, text="STATUS", font=("FreeSans", 18, "bold"),
+                 fg="#bdc3c7", bg="#1a1a1a", anchor="e").pack(side="right", padx=20)
 
         # ---------- List container ----------
         self.list_container = tk.Frame(self, bg="#1a1a1a")
-        self.list_container.pack(fill="both", expand=True, padx=30, pady=(0, 12))  # bottom padding
+        self.list_container.pack(fill="both", expand=True, padx=30, pady=5)
 
         self.list_frame = tk.Frame(self.list_container, bg="#1a1a1a")
         self.list_frame.pack(fill="both", expand=True)
 
         self.update_clock()
-        self.after(300, self.refresh_data)  # small delay so layout is ready
+        self.refresh_data()
 
     def update_clock(self):
         now = datetime.now()
@@ -80,6 +81,7 @@ class WarehouseDisplay(tk.Tk):
         status = item.get("status", "Open")
         color = PRIORITY_COLORS.get(priority, "#2ecc71")
 
+        # Dim completed items
         if status == "Complete":
             row_bg = "#222222"
             text_fg = "#7f8c8d"
@@ -87,19 +89,18 @@ class WarehouseDisplay(tk.Tk):
         else:
             row_bg = "#2c2c2c"
             text_fg = "white"
-            status_fg = "#2ecc71"
+            status_fg = "#2ecc71"  # bright green for Open
 
-        # Slightly tighter vertical spacing
-        pady = max(3, int(row_height * 0.05))
         row = tk.Frame(self.list_frame, bg=row_bg, height=row_height)
-        row.pack(fill="x", pady=pady)
+        row.pack(fill="x", pady=max(4, int(row_height * 0.06)))
         row.pack_propagate(False)
 
-        bar_width = max(8, int(row_height * 0.09))
+        # Left color bar (priority)
+        bar_width = max(10, int(row_height * 0.1))
         tk.Frame(row, bg=color, width=bar_width).pack(side="left", fill="y")
 
-        text = f"#{item.get('order_number', '')}  |  {item.get('location', '')}\n{item.get('description', '')}"
-
+        # Main text
+        text = f"#{item.get('order_number', '')} | {item.get('location', '')}\n{item.get('description', '')}"
         lbl = tk.Label(
             row,
             text=text,
@@ -108,23 +109,139 @@ class WarehouseDisplay(tk.Tk):
             bg=row_bg,
             justify="left",
             anchor="w",
-            padx=18,
-            pady=6
+            padx=20,
+            pady=8
         )
         lbl.pack(side="left", fill="both", expand=True)
 
-        status_font = max(15, int(font_size * 0.58))
+        # Status on the far right
+        status_font = max(16, int(font_size * 0.6))
         status_label = tk.Label(
             row,
             text=status.upper(),
             font=("FreeSans", status_font, "bold"),
             fg=status_fg,
             bg=row_bg,
-            width=11,
+            width=12,
             anchor="e",
-            padx=12
+            padx=15
         )
         status_label.pack(side="right")
+
+        # ---- Double-click to edit ----
+        def on_double(event, it=item):
+            self.open_edit_dialog(it)
+
+        for widget in (row, lbl, status_label):
+            widget.bind("<Double-Button-1>", on_double)
+            # Optional visual feedback
+            widget.configure(cursor="hand2")
+
+    def open_edit_dialog(self, item):
+        """Dark-themed editor that correctly persists status changes."""
+        dialog = tk.Toplevel(self)
+        dialog.title(f"Edit Order #{item.get('order_number', '')}")
+        dialog.geometry("520x300")
+        dialog.configure(bg="#2c2c2c")
+        dialog.transient(self)
+        dialog.grab_set()
+        dialog.focus_force()
+
+        # Center roughly
+        dialog.update_idletasks()
+        x = (self.winfo_screenwidth() - 520) // 2
+        y = (self.winfo_screenheight() - 300) // 2
+        dialog.geometry(f"+{x}+{y}")
+
+        fields = {}
+        row_idx = 0
+
+        def add_field(label_text, widget):
+            nonlocal row_idx
+            tk.Label(dialog, text=label_text, fg="#ecf0f1", bg="#2c2c2c",
+                     font=("FreeSans", 12)).grid(row=row_idx, column=0, sticky="w", padx=18, pady=8)
+            widget.grid(row=row_idx, column=1, sticky="ew", padx=18, pady=8)
+            fields[label_text] = widget
+            row_idx += 1
+
+        # Order #
+        order_e = tk.Entry(dialog, font=("FreeSans", 12), width=36)
+        order_e.insert(0, item.get("order_number", ""))
+        add_field("Order #", order_e)
+
+        # Description
+        desc_e = tk.Entry(dialog, font=("FreeSans", 12), width=36)
+        desc_e.insert(0, item.get("description", ""))
+        add_field("Description", desc_e)
+
+        # Location
+        loc_e = tk.Entry(dialog, font=("FreeSans", 12), width=36)
+        loc_e.insert(0, item.get("location", ""))
+        add_field("Location", loc_e)
+
+        # Priority dropdown
+        pri_cb = ttk.Combobox(dialog, values=["Critical", "High", "Medium", "Normal"],
+                              state="readonly", font=("FreeSans", 12), width=34)
+        pri_cb.set(item.get("priority", "Normal"))
+        add_field("Priority", pri_cb)
+
+        # Status dropdown
+        status_cb = ttk.Combobox(dialog, values=["Open", "Complete"],
+                                 state="readonly", font=("FreeSans", 12), width=34)
+        status_cb.set(item.get("status", "Open"))
+        add_field("Status", status_cb)
+
+        dialog.columnconfigure(1, weight=1)
+
+        def save():
+            updated = {
+                "order_number": order_e.get().strip(),
+                "description": desc_e.get().strip(),
+                "location": loc_e.get().strip(),
+                "priority": pri_cb.get(),
+                "status": status_cb.get()
+            }
+
+            if not updated["order_number"] or not updated["description"]:
+                messagebox.showwarning("Missing Info",
+                                       "Order # and Description are required.",
+                                       parent=dialog)
+                return
+
+            item_id = item.get("id")
+            if item_id is None:
+                messagebox.showerror("Error", "Item has no ID – cannot update.", parent=dialog)
+                return
+
+            try:
+                # 1. Prefer PUT
+                r = requests.put(f"{BASE_URL}/hotlist/{item_id}", json=updated, timeout=3)
+
+                # 2. If PUT is not supported / fails, fall back to POST with id
+                if not r.ok:
+                    updated["id"] = item_id
+                    r = requests.post(f"{BASE_URL}/hotlist", json=updated, timeout=3)
+
+                if r.ok:
+                    dialog.destroy()
+                    self.refresh_data()          # force immediate visual update
+                else:
+                    messagebox.showerror("Update Failed",
+                                         f"Server returned {r.status_code}\n{r.text[:200]}",
+                                         parent=dialog)
+            except Exception as e:
+                messagebox.showerror("Error", str(e), parent=dialog)
+
+        btn_frame = tk.Frame(dialog, bg="#2c2c2c")
+        btn_frame.grid(row=row_idx, column=0, columnspan=2, pady=18)
+
+        tk.Button(btn_frame, text="Save", command=save,
+                  bg="#27ae60", fg="white", font=("FreeSans", 12, "bold"),
+                  width=12, relief="flat", padx=8, pady=4).pack(side="left", padx=10)
+
+        tk.Button(btn_frame, text="Cancel", command=dialog.destroy,
+                  bg="#7f8c8d", fg="white", font=("FreeSans", 12),
+                  width=12, relief="flat", padx=8, pady=4).pack(side="left", padx=10)
 
     def refresh_data(self):
         try:
@@ -135,6 +252,7 @@ class WarehouseDisplay(tk.Tk):
             self.clear_list()
 
             items = data.get("hot_list", [])
+            # Open items first
             items.sort(key=lambda x: 0 if x.get("status", "Open") == "Open" else 1)
 
             count = len(items)
@@ -144,19 +262,13 @@ class WarehouseDisplay(tk.Tk):
                 self.after(REFRESH_MS, self.refresh_data)
                 return
 
-            # Force layout update
+            # Dynamic sizing
             self.update_idletasks()
-            available = self.list_container.winfo_height()
-
-            # Conservative usable height (leave extra room at bottom)
-            usable = max(180, available - 25)
-
-            # Account for the pady that will be added between rows
-            # (approximate total padding = count * avg_pady)
-            ideal = usable / count
-            row_height = max(62, min(150, int(ideal * 0.92)))   # 8% safety margin
-
-            font_size = max(16, min(38, int(row_height * 0.26)))
+            available_height = self.list_container.winfo_height()
+            usable = max(200, available_height - 20)
+            ideal_row = usable / count
+            row_height = max(70, min(160, int(ideal_row)))
+            font_size = max(18, min(42, int(row_height * 0.28)))
 
             for item in items:
                 self.add_item_row(item, row_height, font_size)
