@@ -268,20 +268,25 @@ class ControlApp(tk.Tk):
             if not updated["order_number"] or not updated["description"]:
                 messagebox.showwarning("Missing Info", "Order # and Description are required.", parent=dialog)
                 return
+
             try:
-                # Prefer PUT if your backend supports it, otherwise POST with id
-                requests.put(f"{self.get_base()}/hotlist/{item_id}", json=updated, timeout=3)
-                dialog.destroy()
-                self.refresh()
-            except Exception as e:
-                # Fallback for backends that only have POST
-                try:
-                    updated["id"] = item_id
-                    requests.post(f"{self.get_base()}/hotlist", json=updated, timeout=3)
+                # 1. Try proper update first
+                r = requests.put(f"{self.get_base()}/hotlist/{item_id}", json=updated, timeout=3)
+
+                # 2. If PUT failed → force replace (delete old + create new)
+                if not r.ok:
+                    requests.delete(f"{self.get_base()}/hotlist/{item_id}", timeout=3)
+                    r = requests.post(f"{self.get_base()}/hotlist", json=updated, timeout=3)
+
+                if r.ok:
                     dialog.destroy()
                     self.refresh()
-                except Exception as e2:
-                    messagebox.showerror("Error", str(e2), parent=dialog)
+                else:
+                    messagebox.showerror("Update Failed",
+                                         f"Server returned {r.status_code}\n{r.text[:200]}",
+                                         parent=dialog)
+            except Exception as e:
+                messagebox.showerror("Error", str(e), parent=dialog)
 
         tk.Button(dialog, text="Save", command=save, bg="#27ae60", fg="white", width=12).grid(
             row=5, column=0, columnspan=2, pady=15)
